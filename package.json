@@ -1,6 +1,7 @@
 {
   "name": "toki-bot",
   "type": "module",
+  "main": "index.js"
   "dependencies": {
     "@whiskeysockets/baileys": "^6.7.18",
     "pino": "^9.0.0",
