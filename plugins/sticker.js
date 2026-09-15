@@ -1,2 +1,6 @@
-const {downloadMediaMessage}=require('@whiskeysockets/baileys')
-module.exports={command:["s"],run:async(sock,msg)=>{let q=msg.message.extendedTextMessage?.contextInfo?.quotedMessage?{message:msg.message.extendedTextMessage.contextInfo.quotedMessage,key:msg.key}:msg;let b=await downloadMediaMessage(q,'buffer',{},{reuploadRequest:sock.updateMediaMessage});await sock.sendMessage(msg.key.remoteJid,{sticker:b},{quoted:msg})}}
+export default {
+  command: ['s','sticker'],
+  run: async (client, m) => {
+    await client.sendMessage(m.chat, { text: `Responde a una imagen/video con .s para sticker` }, { quoted: m })
+  }
+}

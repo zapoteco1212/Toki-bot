@@ -1,24 +1,12 @@
-const { exec } = require('child_process')
-module.exports = {
-command: ["fix","update","sync","actualizar","gitpull"],
-run: async (sock, msg) => {
-if(!global.owner.includes((msg.key.participant||msg.key.remoteJid).split('@')[0])) return sock.sendMessage(msg.key.remoteJid,{text:"*Solo mi dueño* 👑"},{quoted:msg})
-await sock.sendMessage(msg.key.remoteJid,{text:"🔄 *Sincronizando con GitHub...*"}, {quoted: msg})
-exec(`cd ~/Toki-bot && git reset --hard && git pull origin main && npm install --silent`, async (err, stdout, stderr) => {
-if(err){
-await sock.sendMessage(msg.key.remoteJid,{text:"❌ Error:\n"+stderr.slice(0,300)}, {quoted: msg})
-return
-}
-let txt = `✅ *ACTUALIZADO DESDE GITHUB*
-
-\`\`\`${stdout.slice(0,500)}\`\`\`
-
-*Reinicia el bot:*
-En Termux haz CTRL+C y luego
-node index.js
-O escribe.reiniciar
-`
-await sock.sendMessage(msg.key.remoteJid,{text:txt}, {quoted: msg})
-})
-}
+import { exec } from 'child_process'
+export default {
+  command: ['fix','actualizar','update'],
+  run: async (client, m) => {
+    await client.sendMessage(m.chat, { text: `⏳ Actualizando...` }, { quoted: m })
+    exec('git fetch origin && git reset --hard origin/main && git pull origin main --force && npm install --silent', async () => {
+      const { loadCommands } = await import('../main.js?u='+Date.now())
+      await loadCommands()
+      await client.sendMessage(m.chat, { text: `✅ Actualizado - ${global.comandos.size} comandos` }, { quoted: m })
+    })
+  }
 }

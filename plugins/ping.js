@@ -1,1 +1,7 @@
-module.exports={command:["ping"],run:async(sock,msg)=>{let s=Date.now();await sock.sendMessage(msg.key.remoteJid,{text:"Pong!"},{quoted:msg});await sock.sendMessage(msg.key.remoteJid,{text:Date.now()-s+"ms"})}}
+export default {
+  command: ['ping','p'],
+  run: async (client, m) => {
+    const start = Date.now()
+    await client.sendMessage(m.chat, { text: `✿ Pong! ${Date.now()-start}ms` }, { quoted: m })
+  }
+}

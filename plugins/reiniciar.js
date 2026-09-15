@@ -1,10 +1,7 @@
-const { exec } = require('child_process')
-module.exports = {
-command: ["reiniciar","restart","r"],
-run: async (sock, msg) => {
-if(!global.owner.includes((msg.key.participant||msg.key.remoteJid).split('@')[0])) return
-await sock.sendMessage(msg.key.remoteJid,{text:"♻️ Reiniciando Toki..."}, {quoted: msg})
-exec(`cd ~/Toki-bot && node index.js`)
-process.exit(0)
-}
+export default {
+  command: ['reiniciar','restart'],
+  run: async (client, m) => {
+    await client.sendMessage(m.chat, { text: `♻️ Reiniciando...` }, { quoted: m })
+    process.exit(0)
+  }
 }
