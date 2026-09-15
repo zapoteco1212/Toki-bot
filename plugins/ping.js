@@ -1,0 +1,1 @@
+module.exports={command:["ping"],run:async(sock,msg)=>{let s=Date.now();await sock.sendMessage(msg.key.remoteJid,{text:"Pong!"},{quoted:msg});await sock.sendMessage(msg.key.remoteJid,{text:Date.now()-s+"ms"})}}
