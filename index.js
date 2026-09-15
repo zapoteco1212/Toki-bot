@@ -1,31 +1,80 @@
-require('./settings.js')
-const fs=require('fs')
-const {default:makeWASocket,useMultiFileAuthState,DisconnectReason,makeCacheableSignalKeyStore}=require('@whiskeysockets/baileys')
-const pino=require('pino')
-async function start(){
-const {state,saveCreds}=await useMultiFileAuthState('sessions')
-const sock=makeWASocket({logger:pino({level:'silent'}),auth:{creds:state.creds,keys:makeCacheableSignalKeyStore(state.keys,pino({level:'silent'}))},browser:["Ubuntu","Chrome","20.0.04"],printQRInTerminal:false})
-sock.ev.on('creds.update',saveCreds)
-sock.ev.on('connection.update',u=>{
-if(u.connection==='open')console.log('✅ Conectado!')
-if(u.connection==='close'&&u.lastDisconnect?.error?.output?.statusCode!=DisconnectReason.loggedOut)start()
-})
-sock.ev.on('messages.upsert',async m=>{
-try{
-let msg=m.messages[0]
-if(!msg.message||msg.key.fromMe)return
-let from=msg.key.remoteJid
-let body=msg.message.conversation||msg.message.extendedTextMessage?.text||msg.message.imageMessage?.caption||""
-if(!body.startsWith('.'))return
-let args=body.trim().split(/ +/)
-let cmd=args.shift().slice(1).toLowerCase()
-let plugins=fs.readdirSync('./plugins').filter(f=>f.endsWith('.js'))
-for(let file of plugins){
-delete require.cache[require.resolve('./plugins/'+file)]
-let plugin=require('./plugins/'+file)
-if(plugin.command.includes(cmd)){await plugin.run(sock,msg,args)}
+import "./settings.js";
+import main, { loadCommands } from './main.js';
+import { Browsers, makeWASocket, makeCacheableSignalKeyStore, useMultiFileAuthState, fetchLatestBaileysVersion, jidDecode, DisconnectReason } from "@whiskeysockets/baileys";
+import pino from "pino";
+import chalk from "chalk";
+import fs from "fs";
+import readline from "readline";
+import { smsg } from "./core/message.js";
+
+const rl = readline.createInterface({ input: process.stdin, output: process.stdout })
+const question = (text) => new Promise(res => rl.question(text, res))
+
+await loadCommands()
+
+async function startBot() {
+  const { state, saveCreds } = await useMultiFileAuthState(global.sessionName);
+  const { version } = await fetchLatestBaileysVersion();
+  const logger = pino({ level: "silent" });
+  const sock = makeWASocket({
+    version,
+    logger,
+    printQRInTerminal: false,
+    browser: Browsers.macOS('Chrome'),
+    auth: { creds: state.creds, keys: makeCacheableSignalKeyStore(state.keys, logger) },
+    getMessage: async () => "",
+  });
+  global.client = sock;
+  sock.ev.on("creds.update", saveCreds);
+
+  if (!state.creds.registered) {
+    console.log(chalk.yellow("No hay sesión, generando código..."))
+    let phone = await question(chalk.magentaBright('Tu número con país (ej: 5217442573779) ---> '))
+    phone = phone.replace(/\D/g,'')
+    if (phone.startsWith('52') && !phone.startsWith('521') && phone.length >= 12) phone = '521' + phone.slice(2)
+    try {
+      await new Promise(r=>setTimeout(r,2000))
+      let code = await sock.requestPairingCode(phone)
+      code = code?.match(/.{1,4}/g)?.join("-") || code
+      console.log(chalk.bgGreen.black(`\n TU CÓDIGO: ${code} \n`))
+    } catch(e){ console.log(chalk.red("Error:", e.message)) }
+  } else {
+    console.log(chalk.blue("Sesión encontrada, conectando..."))
+  }
+
+  sock.ev.on("connection.update", async (update) => {
+    const { connection, lastDisconnect } = update;
+    if (connection === "close") {
+      const reason = lastDisconnect?.error?.output?.statusCode || 0;
+      console.log(chalk.yellow(`Desconectado: ${reason}, reconectando...`))
+      if (reason !== DisconnectReason.loggedOut) setTimeout(startBot, 3000);
+    }
+    if (connection === "open") {
+      try{ rl.close() }catch{}
+      console.log(chalk.green.bold(`\n[ ✿ ] Conectado - ${sock.user.name}\n`))
+    }
+  });
+
+  sock.ev.on('messages.upsert', async (chatUpdate) => {
+    try {
+      const kay = chatUpdate.messages[0];
+      if (!kay?.message) return;
+      if (kay.key.remoteJid === 'status@broadcast') return
+      const m = await smsg(sock, kay);
+      await main(sock, m, chatUpdate);
+    } catch (err) {
+      console.log("Error msg:", err.message)
+    }
+  });
+
+  sock.decodeJid = (jid) => {
+    if (!jid) return jid;
+    if (/:\d+@/gi.test(jid)) {
+      const decode = jidDecode(jid) || {};
+      return (decode.user && decode.server && decode.user + "@" + decode.server) || jid;
+    }
+    return jid;
+  };
 }
-}catch(e){console.log(e.message)}
-})
-}
-start()
+
+startBot()
