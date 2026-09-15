@@ -1,47 +1,31 @@
 import { exec } from 'child_process'
 
 export default {
-  command: ['fix', 'actualizar', 'update', 'actualizacion'],
+  command: ['fix', 'actualizar', 'update'],
   category: 'owner',
   run: async (client, m) => {
-    const nombre = m.pushName || 'Guayalo'
-    const fecha = new Date().toLocaleString('es-MX', { timeZone: 'America/Mexico_City' })
+    const editor = m.pushName || 'Guayalo'
 
-    const inicio = `
-╭━〔 〔 *🔧 TOKI-BOT UPDATE* 〕 〕━⬣
-┃
-┃ *✿ Iniciando actualización...*
-┃
-┃ 👤 *Solicitado por:* ${nombre}
-┃ 📅 *Fecha:* ${fecha}
-┃
-╰━━━━━━━━━━━━⬣
-`.trim()
+    exec('git fetch origin && git reset --hard origin/main && git pull origin main --force && npm install --silent', async () => {
+      
+      // Sacar archivos cambiados del ultimo commit
+      exec('git log -1 --name-only --pretty=format:', async (err, filesOutput) => {
+        try {
+          const { loadCommands } = await import('../main.js?update=' + Date.now())
+          await loadCommands()
 
-    await client.sendMessage(m.chat, { text: inicio }, { quoted: m })
+          let archivos = filesOutput ? filesOutput.trim().split('\n').filter(f=>f) : []
+          let total = archivos.length || 1
+          let detalle = archivos.length ? archivos.map(f=>`• \`${f.trim()}\``).join('\n') : '• `Actualización general`'
 
-    exec('git fetch origin && git reset --hard origin/main && git pull origin main --force && npm install --silent', async (err, stdout) => {
-      try {
-        const { loadCommands } = await import('../main.js?update=' + Date.now())
-        await loadCommands()
+          let texto = `❀ *Actualización exitosa*\n\n⊥ *Editor:* ${editor}\n✎ *Total Cambios:* ${total}\n\n❀ *Detalles de archivos:*\n${detalle}`
 
-        const final = `
-╭━〔 〔 *✅ ACTUALIZACIÓN EXITOSA* 〕 〕━⬣
-┃
-┃ 👤 *Hecho por:* ${nombre}
-┃ 📦 *Comandos:* ${global.comandos.size}
-┃ 🟢 *Estado:* Conectado - Guayalo
-┃ ⏰ *Hora:* ${fecha}
-┃
-╰━━━━━━━━━━━━⬣
-*Gracias por actualizar ✨*
-`.trim()
+          await client.sendMessage(m.chat, { text: texto }, { quoted: m })
 
-        await client.sendMessage(m.chat, { text: final }, { quoted: m })
-
-      } catch (e) {
-        await client.sendMessage(m.chat, { text: `❌ Error: ${e.message}` }, { quoted: m })
-      }
+        } catch (e) {
+          await client.sendMessage(m.chat, { text: `❌ Error: ${e.message}` }, { quoted: m })
+        }
+      })
     })
   }
 }
