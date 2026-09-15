@@ -1,2 +1,8 @@
-node_modules
-sessions
+Sessions/
+sessions/
+session/
+database.json
+settings.json
+node_modules/
+npm-debug.log
+.env
