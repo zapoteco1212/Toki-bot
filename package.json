@@ -1,5 +1,10 @@
 {
   "name": "toki-bot",
   "type": "module",
-  "dependencies": {}
+  "dependencies": {
+    "@whiskeysockets/baileys": "^6.7.18",
+    "pino": "^9.0.0",
+    "chalk": "^4.1.2",
+    "qrcode-terminal": "^0.12.0"
+  }
 }
