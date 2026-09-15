@@ -1,4 +1,6 @@
-import fs from 'fs'
+import { initGlobalDB } from './core/database.js'
+initGlobalDB()
+  import fs from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
 const __filename = fileURLToPath(import.meta.url)
