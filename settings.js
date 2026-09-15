@@ -1,48 +1,47 @@
-/**
- * ╭─❀ T O K I - B O T - O W N E R S P R O ❀
- * Aquí van TODOS los owners, soporta número y LID
- * Formato: [ID, Nombre, true]
- * true = Owner real con todos los permisos
- */
+// ╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮
+// ┃ ✦ T O K I - O W N E R S P R O ┃
+// ┃ Soporta NUMERO y LID 114... ┃
+// ╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯
 
 global.owner = [
-  // --- OWNERS CON NÚMERO ---
-  ["5217442573779", "Toki - Principal", true],
-  ["5217441863414", "Owner 2", true],
-  ["5213121447080", "Owner 3", true],
+  // FORMATO: [ID, Nombre, true]
+  // true = tiene todos los permisos
 
-  // --- OWNERS CON LID (114...) - IMPORTANTE PARA QUE NO TE DIGA "No eres owner" ---
-  ["114414455943397", "Guayalo - LID", true],
-  // Agrega aquí el LID de tus otros owners
-  // ["123456789012345", "Amigo LID", true],
+  // --- TU NUMERO Y TU LID (LOS 2) ---
+  ["5217442573779", "Zapoteco Principal", true],
+  ["114414455943397", "Zapoteco LID", true], // <- ESTE ES EL QUE TE FALTABA
 
-  // --- PUEDES AGREGAR MÁS AQUÍ ABAJO ---
-  // ["5210000000000", "Nuevo Owner", true],
+  // --- TUS OTROS OWNERS ---
+  ["5217441863414", "Owner 2 Numero", true],
+  ["5213121447080", "Owner 3 Numero", true],
+  // Si tu Owner 2 y 3 también tienen LID, agregalos:
+  // ["114xxxxxxxxxxxx", "Owner 2 LID", true],
+  // ["114xxxxxxxxxxxx", "Owner 3 LID", true],
+
+  // --- AGREGA MÁS AQUÍ ABAJO ---
+  // ["521000000000", "Nombre", true],
+  // ["114000000000", "Nombre LID", true],
 ]
 
-// Config del bot
-global.botNumber = "5217442573779"
-global.pairingNumber = "5217442573779"
+global.botNumber = global.owner[0][0]
+global.pairingNumber = global.owner[0][0]
 global.sessionName = "./Sessions/Owner"
 global.botname = "Toki-bot"
-global.db = { data: { settings: {}, chats: {}, users: {}, owners: {} } }
+global.db = { data: { settings: {}, chats: {}, users: {} } }
 global.loadDatabase = async () => {}
 global.conns = []
 
-// --- SISTEMA ANTI-LID: detecta owner aunque WhatsApp mande 114... o 521 o 52 ---
+// ESTA FUNCIÓN HACE QUE SIRVA CON NUMERO Y CON LID
 global.isOwner = (jid) => {
   if (!jid) return false
-  try {
-    let id = jid.split('@')[0]
-    let last10 = id.slice(-10)
-    for (let o of global.owner) {
-      let num = Array.isArray(o)? o[0] : o
-      if (!num) continue
-      let n = String(num)
-      if (id === n) return true // LID exacto
-      if (n.slice(-10) === last10) return true // 521 vs 52
-      if (id.includes(n) || n.includes(id)) return true
-    }
-    return false
-  } catch { return false }
+  let id = jid.split('@')[0]
+  let last10 = id.slice(-10)
+  for (let o of global.owner) {
+    let num = Array.isArray(o)? o[0] : o
+    if (!num) continue
+    num = String(num)
+    if (id === num) return true
+    if (num.slice(-10) === last10) return true
+  }
+  return false
 }
