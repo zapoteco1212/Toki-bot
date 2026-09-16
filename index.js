@@ -1,80 +1,82 @@
-import "./settings.js";
-import main, { loadCommands } from './main.js';
-import { Browsers, makeWASocket, makeCacheableSignalKeyStore, useMultiFileAuthState, fetchLatestBaileysVersion, jidDecode, DisconnectReason } from "@whiskeysockets/baileys";
-import pino from "pino";
-import chalk from "chalk";
-import fs from "fs";
-import readline from "readline";
-import { smsg } from "./core/message.js";
+import { makeWASocket, useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion } from '@whiskeysockets/baileys'
+import pino from 'pino'
+import { fileURLToPath } from 'url'
+import { dirname, join } from 'path'
+import fs from 'fs'
 
-const rl = readline.createInterface({ input: process.stdin, output: process.stdout })
-const question = (text) => new Promise(res => rl.question(text, res))
+const __dirname = dirname(fileURLToPath(import.meta.url))
+global.comandos = new Map()
 
-await loadCommands()
+// CARGAR COMANDOS
+const pluginsFolder = join(__dirname, 'plugins')
+for (let file of fs.readdirSync(pluginsFolder).filter(f => f.endsWith('.js'))) {
+  try {
+    const plugin = await import(`./plugins/${file}`)
+    const cmd = plugin.default || plugin
+    if (cmd.command) {
+      for (let c of cmd.command) {
+        global.comandos.set(c, cmd)
+      }
+    }
+  } catch (e) {
+    console.log(`Error en plugin ${file}:`, e.message)
+  }
+}
 
 async function startBot() {
-  const { state, saveCreds } = await useMultiFileAuthState(global.sessionName);
-  const { version } = await fetchLatestBaileysVersion();
-  const logger = pino({ level: "silent" });
-  const sock = makeWASocket({
+  const { state, saveCreds } = await useMultiFileAuthState('auth')
+  const { version } = await fetchLatestBaileysVersion()
+
+  const client = makeWASocket({
     version,
-    logger,
-    printQRInTerminal: false,
-    browser: Browsers.macOS('Chrome'),
-    auth: { creds: state.creds, keys: makeCacheableSignalKeyStore(state.keys, logger) },
-    getMessage: async () => "",
-  });
-  global.client = sock;
-  sock.ev.on("creds.update", saveCreds);
+    auth: state,
+    // ESTO QUITA EL SPAM QUE TE SALE EN LA CAPTURA
+    logger: pino({ level: 'silent' }),
+    printQRInTerminal: true,
+    browser: ['Toki-Bot', 'Chrome', '1.0.0']
+  })
 
-  if (!state.creds.registered) {
-    console.log(chalk.yellow("No hay sesión, generando código..."))
-    let phone = await question(chalk.magentaBright('Tu número con país (ej: 5217442573779) ---> '))
-    phone = phone.replace(/\D/g,'')
-    if (phone.startsWith('52') && !phone.startsWith('521') && phone.length >= 12) phone = '521' + phone.slice(2)
-    try {
-      await new Promise(r=>setTimeout(r,2000))
-      let code = await sock.requestPairingCode(phone)
-      code = code?.match(/.{1,4}/g)?.join("-") || code
-      console.log(chalk.bgGreen.black(`\n TU CÓDIGO: ${code} \n`))
-    } catch(e){ console.log(chalk.red("Error:", e.message)) }
-  } else {
-    console.log(chalk.blue("Sesión encontrada, conectando..."))
-  }
+  client.ev.on('creds.update', saveCreds)
 
-  sock.ev.on("connection.update", async (update) => {
-    const { connection, lastDisconnect } = update;
-    if (connection === "close") {
-      const reason = lastDisconnect?.error?.output?.statusCode || 0;
-      console.log(chalk.yellow(`Desconectado: ${reason}, reconectando...`))
-      if (reason !== DisconnectReason.loggedOut) setTimeout(startBot, 3000);
+  client.ev.on('connection.update', (update) => {
+    const { connection, lastDisconnect } = update
+    if (connection === 'close') {
+      const shouldReconnect = lastDisconnect?.error?.output?.statusCode!== DisconnectReason.loggedOut
+      console.log('Conexion cerrada, reconectando...', shouldReconnect)
+      if (shouldReconnect) startBot()
+    } else if (connection === 'open') {
+      console.log('✿ TOKI-BOT CONECTADO ✿')
     }
-    if (connection === "open") {
-      try{ rl.close() }catch{}
-      console.log(chalk.green.bold(`\n[ ✿ ] Conectado - ${sock.user.name}\n`))
-    }
-  });
+  })
 
-  sock.ev.on('messages.upsert', async (chatUpdate) => {
-    try {
-      const kay = chatUpdate.messages[0];
-      if (!kay?.message) return;
-      if (kay.key.remoteJid === 'status@broadcast') return
-      const m = await smsg(sock, kay);
-      await main(sock, m, chatUpdate);
-    } catch (err) {
-      console.log("Error msg:", err.message)
-    }
-  });
+  client.ev.on('messages.upsert', async ({ messages }) => {
+    const m = messages[0]
+    if (!m.message) return
+    if (m.key.fromMe) return
 
-  sock.decodeJid = (jid) => {
-    if (!jid) return jid;
-    if (/:\d+@/gi.test(jid)) {
-      const decode = jidDecode(jid) || {};
-      return (decode.user && decode.server && decode.user + "@" + decode.server) || jid;
+    const msgType = Object.keys(m.message)[0]
+    const body = m.message.conversation || m.message.extendedTextMessage?.text || m.message[msgType]?.caption || ''
+    if (!body) return
+
+    const prefix = '.'
+    if (!body.startsWith(prefix)) return
+
+    const args = body.slice(prefix.length).trim().split(/ +/)
+    const command = args.shift().toLowerCase()
+
+    m.pushName = m.pushName || 'Guayalo'
+    m.chat = m.key.remoteJid
+    m.text = body
+
+    const plugin = global.comandos.get(command)
+    if (plugin) {
+      try {
+        await plugin.run(client, m, args)
+      } catch (e) {
+        console.log(e)
+      }
     }
-    return jid;
-  };
+  })
 }
 
 startBot()
