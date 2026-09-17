@@ -12,7 +12,7 @@ global.owner = [
   ["114414455943397", "Zapoteco LID", true], // <- ESTE ES EL QUE TE FALTABA
 
   // --- TUS OTROS OWNERS ---
-  ["5217441863414", "Owner 2 Numero", true],
+  ["5216561814016", "Gael ", true],
   
   // Si tu Owner 2 y 3 también tienen LID, agregalos:
   // ["114xxxxxxxxxxxx", "Owner 2 LID", true],
