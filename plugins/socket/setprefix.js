@@ -1,4 +1,5 @@
 import db from "#db"
+
 export default {
   command: ['setprefix','setbotprefix','prefix'],
   category: 'socket',
@@ -7,9 +8,10 @@ export default {
     const def = [".","#","/","!"]
     const config = await db.getSettings(idBot)
     let value = args.join('').trim()
+
     if (!value) {
       let actual = config.prefijo === 1? 'sin prefijos' : Array.isArray(config.prefijo)? config.prefijo.join(' ') : config.prefijo
-      return sock.sendMessage(msg.chat, { text: `Actual: ${actual}\n\nUsa: ${usedPrefix+command} *\n${usedPrefix+command} reset\n${usedPrefix+command} noprefix` }, { quoted: msg })
+      return sock.sendMessage(msg.chat, { text: `Actual: ${actual}\n\nUsa:\n${usedPrefix+command} *\n${usedPrefix+command} reset\n${usedPrefix+command} noprefix` }, { quoted: msg })
     }
     if (value.toLowerCase() === 'reset') {
       await db.updateSettings(idBot, 'prefijo', def)
@@ -17,11 +19,11 @@ export default {
     }
     if (value.toLowerCase() === 'noprefix') {
       await db.updateSettings(idBot, 'prefijo', 1)
-      return sock.sendMessage(msg.chat, { text: `✅ Sin prefijos, escribe: menu` }, { quoted: msg })
+      return sock.sendMessage(msg.chat, { text: `✅ Sin prefijos. Escribe: menu` }, { quoted: msg })
     }
-    let lista = [...new Set([...value])].filter(v => v.trim()!=='').filter(v=>!/^[a-zA-Z0-9]$/.test(v))
+    let lista = [...new Set([...value])].filter(v=>v.trim()!=='').filter(v=>!/^[a-zA-Z0-9]$/.test(v))
     if (!lista.length) return sock.sendMessage(msg.chat, { text: `❌ Ej: ${usedPrefix+command} *` }, { quoted: msg })
     await db.updateSettings(idBot, 'prefijo', lista)
-    return sock.sendMessage(msg.chat, { text: `✅ Nuevo prefijo: ${lista.join(' ')}\nUsa: ${lista[0]}menu` }, { quoted: msg })
+    return sock.sendMessage(msg.chat, { text: `✅ Nuevo prefijo: ${lista.join(' ')}\nPrueba: ${lista[0]}menu` }, { quoted: msg })
   }
-              }
+    }
