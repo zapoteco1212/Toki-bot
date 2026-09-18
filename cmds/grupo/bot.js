@@ -1,4 +1,4 @@
-// cmds/grupo/bot.js
+
 export default {
   command: ['bot'],
   category: 'grupo',
