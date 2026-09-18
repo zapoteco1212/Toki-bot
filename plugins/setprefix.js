@@ -9,7 +9,17 @@ const loadSettings = () => {
   return JSON.parse(fs.readFileSync(SETTINGS))
 }
 
-const saveSettings = (s) => fs.writeFileSync(SETTINGS, JSON.stringify(s, null, 2))
+const saveSettings = (s) => {
+  fs.writeFileSync(SETTINGS, JSON.stringify(s, null, 2))
+  
+  try {
+    global.prefix = s.prefix
+    if (global.db?.data?.settings) {
+      const botId = Object.keys(global.db.data.settings)[0]
+      if (botId) global.db.data.settings[botId].prefix = s.prefix
+    }
+  } catch {}
+}
 
 export default {
   command: ['setprefix', 'setbotprefix', 'prefix', 'prefijo'],
@@ -23,12 +33,12 @@ export default {
     const value = args.join(' ').trim()
 
     const current = Array.isArray(settings.prefix) && settings.prefix.length
-      ? settings.prefix.map(p => `\`${p}\``).join(', ')
+     ? settings.prefix.map(p => `\`${p}\``).join(', ')
       : '`sin prefijos (noprefix)`'
 
     if (!value) {
       return client.sendMessage(m.chat, {
-        text: `⌗°娲°₊ *— SetPrefix Toki-Bot* ✿\n\n─────────────────\n❀ *Opciones disponibles:*\n\n> *○ Only-Prefix:* .setprefix *.*\n> *○ Multi-Prefix:* .setprefix *!/.#*\n> *○ No-Prefix:* .setprefix *noprefix*\n> *○ Reset:* .setprefix *reset*\n\n─────────────────\nꕥ *Actual:* ${current}\n─────────────────`
+        text: `⌗°娲°₊ *— SetPrefix Toki-Bot* ✿\n\n─────────────────\n❀ *Opciones disponibles:*\n\n> *○ Only-Prefix:*.setprefix *.*\n> *○ Multi-Prefix:*.setprefix *!/.#*\n> *○ No-Prefix:*.setprefix *noprefix*\n> *○ Reset:*.setprefix *reset*\n\n─────────────────\nꕥ *Actual:* ${current}\n─────────────────`
       }, { quoted: m })
     }
 
@@ -36,7 +46,7 @@ export default {
       settings.prefix = defaultPrefix
       saveSettings(settings)
       return client.sendMessage(m.chat, {
-        text: `⌗°娲°₊\n❀ Prefijos restaurados correctamente\n─────────────────\nꕥ *Prefijos:* ${defaultPrefix.map(v=>`\`${v}\``).join(' ')}\n─────────────────`
+        text: `⌗°娲°₊\n❀ Prefijos restaurados correctamente\n─────────────────\nꕥ *Prefijos:* ${defaultPrefix.map(v=>`\`${v}\``).join(' ')}\n─────────────────\n> Ya puedes usar el bot con esos prefijos.`
       }, { quoted: m })
     }
 
@@ -44,11 +54,11 @@ export default {
       settings.prefix = []
       saveSettings(settings)
       return client.sendMessage(m.chat, {
-        text: `⌗°娲°₊\n❀ *Modo sin prefijos activado*\n─────────────────\nꕥ Ahora el bot responderá sin necesidad de prefijo.\n─────────────────\n> Ej: *ping*, *menu*`
+        text: `⌗°娲°₊\n❀ *Modo sin prefijos activado*\n─────────────────\nꕥ Ahora el bot responderá sin necesidad de prefijo.\n─────────────────`
       }, { quoted: m })
     }
 
-    let lista = [...new Set(value.split(''))].filter(c => !/[a-zA-Z0-9\s]/.test(c))
+    let lista = [...new Set(value.split(''))].filter(c =>!/[a-zA-Z0-9\s]/.test(c))
 
     if (lista.length === 0) {
       return client.sendMessage(m.chat, {
@@ -66,7 +76,7 @@ export default {
     saveSettings(settings)
 
     return client.sendMessage(m.chat, {
-      text: `⌗°娲°₊\n❀ *Prefijo actualizado*\n─────────────────\nꕥ *Nuevos prefijos:* ${lista.map(v=>`\`${v}\``).join(' ')}\n─────────────────\n> Usa *.fix* y reinicia para aplicar 100%`
+      text: `⌗°娲°₊\n❀ *Prefijo actualizado*\n─────────────────\nꕥ *Nuevos prefijos:* ${lista.map(v=>`\`${v}\``).join(' ')}\n─────────────────\n> Ya puedes usar el bot.`
     }, { quoted: m })
   }
   }
