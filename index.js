@@ -3,16 +3,14 @@ import pino from 'pino'
 import { fileURLToPath } from 'url'
 import { dirname, join } from 'path'
 import fs from 'fs'
+import qrcode from 'qrcode-terminal'
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
 let db
-for (let p of ["./lib/db.js","./lib/database.js","./src/db.js","./database.js","./db.js","./lib/lowdb.js"]) {
-  try { db = (await import(p)).default; console.log(`✓ DB encontrada en ${p}`); break } catch {}
+for (let p of ["./lib/db.js","./lib/database.js","./src/db.js","./database.js","./db.js"]) {
+  try { db = (await import(p)).default; console.log("DB real en "+p); break } catch {}
 }
-if (!db) {
-  console.log('⚠ No se encontró DB, usando memoria temporal')
-  db = { getSettings: async()=>({prefijo:["."]}), updateSettings: async()=>{} }
-}
+if (!db) console.log("AVISO: usando prefijo en archivo./lib/prefix.json")
 
 global.comandos = new Map()
 function loadPlugins(dir) {
@@ -20,34 +18,49 @@ function loadPlugins(dir) {
     const fullPath = join(dir, file)
     if (fs.statSync(fullPath).isDirectory()) loadPlugins(fullPath)
     else if (file.endsWith('.js')) {
-      import(`file://${fullPath}`).then(p=>{
-        const cmd = p.default || p
+      import("file://"+fullPath).then(pl=>{
+        const cmd = pl.default || pl
         if (cmd.command) for (let c of cmd.command) global.comandos.set(c, cmd)
-      }).catch(e=>console.log(`Error ${file}:`, e.message))
+      })
     }
   }
 }
 loadPlugins(join(__dirname, 'plugins'))
 
-async function getPrefix(idBot) {
+function getPrefixFromFile() {
   try {
+    if (fs.existsSync('./lib/prefix.json')) return JSON.parse(fs.readFileSync('./lib/prefix.json','utf8'))
+  } catch {}
+  return null
+}
+
+async function getPrefix(idBot) {
+  let filePref = getPrefixFromFile()
+  if (filePref) {
+    if (filePref === 1) return []
+    if (Array.isArray(filePref)) return filePref
+  }
+  try {
+    if (!db) return filePref || ["."]
     const c = await db.getSettings(idBot)
     if (c.prefijo === 1) return []
     if (Array.isArray(c.prefijo)) return c.prefijo
-    return ["."]
-  } catch { return ["."] }
+    return filePref || ["."]
+  } catch { return filePref || ["."] }
 }
 
 async function startBot() {
   const { state, saveCreds } = await useMultiFileAuthState('auth')
   const { version } = await fetchLatestBaileysVersion()
-  const client = makeWASocket({ version, auth: state, logger: pino({level:'silent'}), printQRInTerminal: true, browser: ['Toki-Bot','Chrome','1.0.0'] })
+  const client = makeWASocket({ version, auth: state, logger: pino({level:'silent'}), browser: ['Toki-Bot','Chrome','1.0.0'] })
   client.ev.on('creds.update', saveCreds)
   client.ev.on('connection.update', u=>{
-    if (u.connection === 'close') {
-      const r = u.lastDisconnect?.error?.output?.statusCode!==DisconnectReason.loggedOut
+    const { connection, lastDisconnect, qr } = u
+    if (qr) qrcode.generate(qr, { small: true })
+    if (connection === 'close') {
+      const r = lastDisconnect?.error?.output?.statusCode!==DisconnectReason.loggedOut
       if (r) startBot()
-    } else if (u.connection === 'open') console.log('✿ TOKI-BOT CONECTADO ✿')
+    } else if (connection === 'open') console.log('CONECTADO')
   })
   client.ev.on('messages.upsert', async ({messages})=>{
     const m = messages[0]
