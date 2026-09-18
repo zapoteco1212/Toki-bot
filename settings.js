@@ -5,7 +5,7 @@ import { fileURLToPath } from 'url'
 const botOwner = ['5217442573779'] 
 
 const mainOwners = [
-  '', // Owner 1
+  '5217441863414', werrkito
   '', // Owner 2
   '', // Owner 3
 ]
