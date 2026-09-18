@@ -1,4 +1,8 @@
-import db from "#db"
+let db
+for (let p of ["../../lib/db.js","../../lib/database.js","../../src/db.js","../../database.js"]) {
+  try { db = (await import(p)).default; break } catch {}
+}
+if (!db) db = { getSettings: async()=>({prefijo:["."]}), updateSettings: async()=>{} }
 
 export default {
   command: ['setprefix','setbotprefix','prefix'],
@@ -8,10 +12,9 @@ export default {
     const def = [".","#","/","!"]
     const config = await db.getSettings(idBot)
     let value = args.join('').trim()
-
     if (!value) {
       let actual = config.prefijo === 1? 'sin prefijos' : Array.isArray(config.prefijo)? config.prefijo.join(' ') : config.prefijo
-      return sock.sendMessage(msg.chat, { text: `Actual: ${actual}\n\nUsa:\n${usedPrefix+command} *\n${usedPrefix+command} reset\n${usedPrefix+command} noprefix` }, { quoted: msg })
+      return sock.sendMessage(msg.chat, { text: `Actual: ${actual}\nUsa: ${usedPrefix+command} *` }, { quoted: msg })
     }
     if (value.toLowerCase() === 'reset') {
       await db.updateSettings(idBot, 'prefijo', def)
@@ -19,11 +22,11 @@ export default {
     }
     if (value.toLowerCase() === 'noprefix') {
       await db.updateSettings(idBot, 'prefijo', 1)
-      return sock.sendMessage(msg.chat, { text: `✅ Sin prefijos. Escribe: menu` }, { quoted: msg })
+      return sock.sendMessage(msg.chat, { text: `✅ Sin prefijos` }, { quoted: msg })
     }
     let lista = [...new Set([...value])].filter(v=>v.trim()!=='').filter(v=>!/^[a-zA-Z0-9]$/.test(v))
     if (!lista.length) return sock.sendMessage(msg.chat, { text: `❌ Ej: ${usedPrefix+command} *` }, { quoted: msg })
     await db.updateSettings(idBot, 'prefijo', lista)
-    return sock.sendMessage(msg.chat, { text: `✅ Nuevo prefijo: ${lista.join(' ')}\nPrueba: ${lista[0]}menu` }, { quoted: msg })
+    return sock.sendMessage(msg.chat, { text: `✅ Nuevo: ${lista.join(' ')} | Usa: ${lista[0]}menu` }, { quoted: msg })
   }
-    }
+                                         }
