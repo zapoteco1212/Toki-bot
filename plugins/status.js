@@ -24,7 +24,7 @@ const getFolderSize = (dirPath) => {
 export default {
   command: ['status','st','estado','p2'],
   help: ['status'],
-  tags: ['info'],
+  tags: ['inf'],
   desc: 'Status estilo Elaina adaptado a Toki',
 
   run: async (client, m) => {
