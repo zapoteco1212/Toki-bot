@@ -1,4 +1,3 @@
-//echo por werkito
 export const bodyMenu = `> 𖧧 ¡Hola! *@$sender*, Soy *$namebot*, Aquí tienes la lista de comandos$cat
 
 ༺═━━━━━✦❖✦━━━━━═༻
@@ -11,7 +10,7 @@ export const bodyMenu = `> 𖧧 ¡Hola! *@$sender*, Soy *$namebot*, Aquí tienes
 ❖ *ᴜʀʟ ::* $link
 ༺═━━━━━✦❖✦━━━━━═༻
 > Vincula un *Socket* con tu número utilizando *$prefixqr* o *$prefixcode*.
-‧꒷︶꒷꒥꒷‧₊˚꒷︶꒷꒥꒷︶꒷˚₊‧꒷꒥꒷︶꒷‧`
+‧꒷︶꒷꒥꒷‧₊˚꒷︶꒷‧₊˚꒷︶꒷‧₊˚꒷︶꒷‧`
 
 export const menuObject = {
 economia: `༺═────────────═༻
