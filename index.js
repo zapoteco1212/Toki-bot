@@ -3,23 +3,38 @@ import pino from 'pino'
 import { fileURLToPath } from 'url'
 import { dirname, join } from 'path'
 import fs from 'fs'
+import db from "#db"
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 global.comandos = new Map()
 
-// CARGAR COMANDOS
-const pluginsFolder = join(__dirname, 'plugins')
-for (let file of fs.readdirSync(pluginsFolder).filter(f => f.endsWith('.js'))) {
-  try {
-    const plugin = await import(`./plugins/${file}`)
-    const cmd = plugin.default || plugin
-    if (cmd.command) {
-      for (let c of cmd.command) {
-        global.comandos.set(c, cmd)
-      }
+// CARGAR COMANDOS RECURSIVO (incluye plugins/socket/)
+function loadPlugins(dir) {
+  for (let file of fs.readdirSync(dir)) {
+    const fullPath = join(dir, file)
+    if (fs.statSync(fullPath).isDirectory()) {
+      loadPlugins(fullPath)
+    } else if (file.endsWith('.js')) {
+      import(fullPath).then(plugin => {
+        const cmd = plugin.default || plugin
+        if (cmd.command) {
+          for (let c of cmd.command) global.comandos.set(c, cmd)
+        }
+      }).catch(e => console.log(`Error en plugin ${file}:`, e.message))
     }
-  } catch (e) {
-    console.log(`Error en plugin ${file}:`, e.message)
+  }
+}
+loadPlugins(join(__dirname, 'plugins'))
+
+async function getPrefix(idBot) {
+  try {
+    const config = await db.getSettings(idBot)
+    if (config.prefijo === 1) return [] // noprefix
+    if (Array.isArray(config.prefijo)) return config.prefijo
+    if (typeof config.prefijo === 'string') return [config.prefijo]
+    return [".", "#", "/", "!"]
+  } catch {
+    return ["."]
   }
 }
 
@@ -30,7 +45,6 @@ async function startBot() {
   const client = makeWASocket({
     version,
     auth: state,
-    // ESTO QUITA EL SPAM QUE TE SALE EN LA CAPTURA
     logger: pino({ level: 'silent' }),
     printQRInTerminal: true,
     browser: ['Toki-Bot', 'Chrome', '1.0.0']
@@ -51,27 +65,50 @@ async function startBot() {
 
   client.ev.on('messages.upsert', async ({ messages }) => {
     const m = messages[0]
-    if (!m.message) return
-    if (m.key.fromMe) return
+    if (!m.message || m.key.fromMe) return
 
     const msgType = Object.keys(m.message)[0]
     const body = m.message.conversation || m.message.extendedTextMessage?.text || m.message[msgType]?.caption || ''
     if (!body) return
 
-    const prefix = '.'
-    if (!body.startsWith(prefix)) return
+    const idBot = client.user.id.split(':')[0] + '@s.whatsapp.net'
+    const prefixes = await getPrefix(idBot)
 
-    const args = body.slice(prefix.length).trim().split(/ +/)
+    let usedPrefix = ''
+    let isCmd = false
+
+    if (prefixes.length === 0) {
+      // modo noprefix
+      isCmd = true
+      usedPrefix = ''
+    } else {
+      for (let p of prefixes) {
+        if (body.startsWith(p)) {
+          usedPrefix = p
+          isCmd = true
+          break
+        }
+      }
+    }
+    if (!isCmd) return
+
+    const args = body.slice(usedPrefix.length).trim().split(/ +/)
     const command = args.shift().toLowerCase()
+    if (!command) return
 
-    m.pushName = m.pushName || 'Guayalo'
     m.chat = m.key.remoteJid
     m.text = body
+    m.sender = m.key.participant || m.key.remoteJid
 
     const plugin = global.comandos.get(command)
     if (plugin) {
       try {
-        await plugin.run(client, m, args)
+        // para compatibilidad con tus plugins tipo socket
+        if (plugin.category === 'socket') {
+          await plugin.run({ msg: m, sock: client, args, command, usedPrefix, text: args.join(' ') })
+        } else {
+          await plugin.run(client, m, args)
+        }
       } catch (e) {
         console.log(e)
       }
