@@ -1,26 +1,44 @@
-let handler = async (sock, m, args) => {
-  let who = m.key?.participant || m.key?.remoteJid || m.sender || m.chat
-  let data = global.db?.data?.users?.[who] || global.db?.users?.[who] || {}
+import { resolveLidToRealJid } from "../../core/utils.js"
 
-  let coins = data.coins?? data.coin?? data.money?? data.dinero?? data.wallet?? data.limit?? 0
-  let bank = data.bank?? data.banco?? 0
-  let exp = data.exp?? data.xp?? 0
-  let level = data.level?? data.nivel?? 0
+export default {
+  command: ['balance', 'bal', 'coins', 'bank', 'cartera', 'dinero'],
+  category: 'economia',
+  run: async (client, m, args, usedPrefix) => {
+    const db = global.db.data
+    const chatId = m.chat
+    const chatData = db.chats[chatId]
+    const botId = client.user.id.split(':')[0] + "@s.whatsapp.net"
+    const botSettings = db.settings[botId]
+    const monedas = botSettings?.currency || "Toki Coins"
 
-  let txt = `╭─〔 ✿ 𝗧𝗢𝗞𝗜 - 𝗕𝗔𝗟 ✿ 〕─╮
+    if (chatData?.adminonly ||!chatData?.economy) return m.reply(
+      `╭─〔 ✿ Toki Bot 〕─╮\n│ Economía desactivada en este grupo.\n│ Actívala con:\n│ » *${usedPrefix}economy on*\n╰─╯`
+    )
+
+    const mentioned = m.mentionedJid || []
+    const who2 = mentioned.length > 0? mentioned[0] : (m.quoted? m.quoted.sender : m.sender)
+    const who = await resolveLidToRealJid(who2, client, m.chat)
+
+    if (!(who in db.chats[m.chat].users)) {
+      return m.reply(`《✿》 El usuario no está registrado en Toki.`)
+    }
+
+    const user = chatData.users[who]
+    const total = (user.coins || 0) + (user.bank || 0)
+    const name = global.db.data.users[who]?.name || "Usuario"
+
+    const bal = `╭─〔 ✿ 𝗧𝗢𝗞𝗜 - 𝗕𝗔𝗟 ✿ 〕─╮
 │
-│ ❀ @${who.split('@')[0]}
+│ ❀ Usuario: <${name}>
 │
-│ 💰 Cartera: ${coins}
-│ 🏦 Banco: ${bank}
-│ 💎 Total: ${coins + bank}
-│ ⭐ Nivel: ${level} | Exp: ${exp}
+│ ⛀ Cartera › *¥${user.coins?.toLocaleString() || 0} ${monedas}*
+│ ⚿ Banco › *¥${user.bank?.toLocaleString() || 0} ${monedas}*
+│ ⛁ Total › *¥${total.toLocaleString()} ${monedas}*
 │
-╰─〔 Toki Bot 〕─╯`
+│ > _Deposita con ${usedPrefix}deposit para proteger tu dinero_
+│
+╰─〔 🐾 Toki Bot 〕─╯`
 
-  await sock.sendMessage(m.chat, { text: txt, mentions: [who] }, { quoted: m })
-}
-
-handler.command = ['bal','balance','cartera','wallet','coins','dinero']
-handler.category = 'economia'
-export default handler
+    await client.sendMessage(chatId, { text: bal }, { quoted: m })
+  }
+};
