@@ -1,4 +1,4 @@
-
+//echo por werkito
 export const bodyMenu = `> 𖧧 ¡Hola! *@$sender*, Soy *$namebot*, Aquí tienes la lista de comandos$cat
 
 ༺═━━━━━✦❖✦━━━━━═༻
