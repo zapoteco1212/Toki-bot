@@ -1,6 +1,10 @@
 import os from 'os'
 import fs from 'fs'
 import path from 'path'
+import { exec } from 'child_process'
+import { promisify } from 'util'
+
+const execPromise = promisify(exec)
 
 const getFolderSize = (dirPath) => {
   let size = 0
@@ -25,34 +29,45 @@ export default {
 
   run: async (client, m) => {
     const start = Date.now()
-    const key = await client.sendMessage(m.chat, { text: '✿ *Calculando status...* ✿' }, { quoted: m })
+    const sent = await client.sendMessage(m.chat, { text: '✿ *Calculando status...* ✿' }, { quoted: m })
+
+    let gitStatus = ""
+    try {
+      await execPromise('git fetch origin main').catch(()=>{})
+      const { stdout: local } = await execPromise('git rev-parse HEAD').catch(()=>({stdout:''}))
+      const { stdout: remote } = await execPromise('git rev-parse origin/main').catch(()=>({stdout:''}))
+
+      if (local.trim() && remote.trim() && local.trim() !== remote.trim()) {
+        const { stdout: filesChanged } = await execPromise('git diff --name-only HEAD..origin/main')
+        const fileList = filesChanged.trim().split('\n').filter(f=>f)
+        const count = fileList.length
+        const listFormatted = fileList.slice(0,15).map(f=>`- ${f}`).join('\n')
+        gitStatus = `\n: ̗̀❖ *ᴀᴄᴛᴜᴀʟɪᴢᴀᴄɪᴏɴ ::* ${count} archivos nuevos\n\`\`\`\n${listFormatted}\n\`\`\``
+      } else {
+        gitStatus = `\n: ̗̀❖ *ɢɪᴛ ::* Actualizado ✓`
+      }
+    } catch {
+      gitStatus = `\n: ̗̀❖ *ɢɪᴛ ::* Error al consultar`
+    }
 
     const latency = Date.now() - start
     const up = process.uptime()
     const h = Math.floor(up / 3600)
     const min = Math.floor((up % 3600) / 60)
     const s = Math.floor(up % 60)
-
     const ram = (process.memoryUsage().heapUsed / 1024 / 1024).toFixed(2)
-    const totalMem = (os.totalmem() / 1024 / 1024 / 1024).toFixed(2)
-    const freeMem = (os.freemem() / 1024 / 1024 / 1024).toFixed(2)
     const usedRom = (getFolderSize(process.cwd()) / 1024 / 1024).toFixed(2)
-    const cpu = os.cpus()[0]?.model || 'Unknown'
-    const platform = `${os.type()} ${os.release()} ${os.arch()}`
 
     let txt = `> *Status - Toki-Bot* ✿\n\n`
     txt += `⌒࣪᷼⏜͡ ۪ ࿚ꨪᰰ࿙ ࣭࣪⢏࣭۟⢢࣭ׄ᎐፝֟᎐࣭ׄ⡔࣭۟⡹࣭ׄ ࿚ꨪᰰ࿙ ۪ ͡⏜ׄ᷼⌒\n\n`
     txt += `: ̗̀❖ *ᴘɪɴɢ ::* ${latency}ms\n`
     txt += `: ̗̀❖ *ᴜᴘᴛɪᴍᴇ ::* ${h}h ${min}m ${s}s\n`
-    txt += `: ̗̀❖ *ᴘʟᴀᴛғᴏʀᴍ ::* ${platform}\n`
-    txt += `: ̗̀❖ *ᴄᴘᴜ ::* ${cpu.slice(0, 35)}\n`
-    txt += `: ̗̀❖ *ʀᴀᴍ ::* ${ram} MB / ${totalMem} GB\n`
-    txt += `: ̗̀❖ *ʀᴀᴍ ʟɪʙʀᴇ ::* ${freeMem} GB\n`
-    txt += `: ̗̀❖ *ᴀʟᴍᴀᴄᴇɴ ::* ${usedRom} MB\n`
-    txt += `: ̗̀❖ *ɴᴏᴅᴇ ::* ${process.version}\n\n`
-    txt += `⌒࣪᷼⏜͡ ۪ ࿚ꨪᰰ࿙ ࣭࣪⢏࣭۟⢢࣭ׄ᎐፝֟᎐࣭ׄ⡔࣭۟⡹࣭ׄ ࿚ꨪᰰ࿙ ۪ ͡⏜ׄ᷼⌒\n\n`
-    txt += `> *Toki-Bot ✿ Activo*`
+    txt += `: ̗̀❖ *ᴘʟᴀᴛғᴏʀᴍ ::* ${os.type()} ${os.release()} ${os.arch()}\n`
+    txt += `: ̗̀❖ *ʀᴀᴍ ::* ${ram} MB\n`
+    txt += `: ̗̀❖ *ᴀʟᴍᴀᴄᴇɴ ::* ${usedRom} MB`
+    txt += `${gitStatus}\n\n`
+    txt += `⌒࣪᷼⏜͡ ۪ ࿚ꨪᰰ࿙ ࣭࣪⢏࣭۟⢢࣭ׄ᎐፝֟᎐࣭ׄ⡔࣭۟⡹࣭ׄ ࿚ꨪᰰ࿙ ۪ ͡⏜ׄ᷼⌒`
 
-    await client.sendMessage(m.chat, { text: txt, edit: key.key })
+    await client.sendMessage(m.chat, { text: txt, edit: sent.key })
   }
-            }
+      }
