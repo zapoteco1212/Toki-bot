@@ -25,29 +25,30 @@ export default {
   command: ['status','st','estado','p2'],
   help: ['status'],
   tags: ['info'],
-  desc: 'Ver el estado del Bot.',
+  desc: 'Status estilo Elaina adaptado a Toki',
 
   run: async (client, m) => {
     const start = Date.now()
-    const sent = await client.sendMessage(m.chat, { text: '✿ *Calculando status...* ✿' }, { quoted: m })
+    const userTag = m.pushName || m.sender.split('@')[0]
+
+    const sent = await client.sendMessage(m.chat, {
+      text: `⌗°娲°₊\n\`Usuario:\` *${userTag}*\n─────────────────\n❀ *Calculando ping…*\n─────────────────`
+    }, { quoted: m })
 
     let gitStatus = ""
     try {
       await execPromise('git fetch origin main').catch(()=>{})
-      const { stdout: local } = await execPromise('git rev-parse HEAD').catch(()=>({stdout:''}))
-      const { stdout: remote } = await execPromise('git rev-parse origin/main').catch(()=>({stdout:''}))
-
-      if (local.trim() && remote.trim() && local.trim() !== remote.trim()) {
+      const { stdout: local } = await execPromise('git rev-parse HEAD')
+      const { stdout: remote } = await execPromise('git rev-parse origin/main')
+      if (local.trim()!== remote.trim()) {
         const { stdout: filesChanged } = await execPromise('git diff --name-only HEAD..origin/main')
         const fileList = filesChanged.trim().split('\n').filter(f=>f)
         const count = fileList.length
-        const listFormatted = fileList.slice(0,15).map(f=>`- ${f}`).join('\n')
-        gitStatus = `\n: ̗̀❖ *ᴀᴄᴛᴜᴀʟɪᴢᴀᴄɪᴏɴ ::* ${count} archivos nuevos\n\`\`\`\n${listFormatted}\n\`\`\``
-      } else {
-        gitStatus = `\n: ̗̀❖ *ɢɪᴛ ::* Actualizado ✓`
+        const listFormatted = fileList.map(f=>`- ${f}`).join('\n')
+        gitStatus = `\n─────────────────\n*¡Actualización disponible!*\n✎ \`GitHub:\` ${count} archivos.\n─────────────────\n\`\`\`\n${listFormatted}\n\`\`\``
       }
     } catch {
-      gitStatus = `\n: ̗̀❖ *ɢɪᴛ ::* Error al consultar`
+      gitStatus = `\n\`GitHub:\` Error en la consulta.`
     }
 
     const latency = Date.now() - start
@@ -55,19 +56,18 @@ export default {
     const h = Math.floor(up / 3600)
     const min = Math.floor((up % 3600) / 60)
     const s = Math.floor(up % 60)
+    const uptimeStr = `[ ${h}h ${min}m ${s}s ]`
     const ram = (process.memoryUsage().heapUsed / 1024 / 1024).toFixed(2)
     const usedRom = (getFolderSize(process.cwd()) / 1024 / 1024).toFixed(2)
 
-    let txt = `> *Status - Toki-Bot* ✿\n\n`
-    txt += `⌒࣪᷼⏜͡ ۪ ࿚ꨪᰰ࿙ ࣭࣪⢏࣭۟⢢࣭ׄ᎐፝֟᎐࣭ׄ⡔࣭۟⡹࣭ׄ ࿚ꨪᰰ࿙ ۪ ͡⏜ׄ᷼⌒\n\n`
-    txt += `: ̗̀❖ *ᴘɪɴɢ ::* ${latency}ms\n`
-    txt += `: ̗̀❖ *ᴜᴘᴛɪᴍᴇ ::* ${h}h ${min}m ${s}s\n`
-    txt += `: ̗̀❖ *ᴘʟᴀᴛғᴏʀᴍ ::* ${os.type()} ${os.release()} ${os.arch()}\n`
-    txt += `: ̗̀❖ *ʀᴀᴍ ::* ${ram} MB\n`
-    txt += `: ̗̀❖ *ᴀʟᴍᴀᴄᴇɴ ::* ${usedRom} MB`
-    txt += `${gitStatus}\n\n`
-    txt += `⌒࣪᷼⏜͡ ۪ ࿚ꨪᰰ࿙ ࣭࣪⢏࣭۟⢢࣭ׄ᎐፝֟᎐࣭ׄ⡔࣭۟⡹࣭ׄ ࿚ꨪᰰ࿙ ۪ ͡⏜ׄ᷼⌒`
+    let txt = `⌗°娲°₊\n\`Usuario:\` *${userTag}*\n`
+    txt += `─────────────────\n❀ \`Ping:\` ${latency} ms\n─────────────────\n`
+    txt += `*ⴵ* \`Uptime:\` ${uptimeStr}\n`
+    txt += `─────────────────\n`
+    txt += `*ⴵ* \`Último en reiniciar:\` Toki-Bot\n`
+    txt += `ꕥ \`RAM usada:\` ${ram} MB\n`
+    txt += `ꕥ \`Almac. usado:\` ${usedRom} MB${gitStatus}\n─────────────────`
 
-    await client.sendMessage(m.chat, { text: txt, edit: sent.key })
+    await client.sendMessage(m.chat, { text: txt.trim(), edit: sent.key })
   }
-      }
+                           }
