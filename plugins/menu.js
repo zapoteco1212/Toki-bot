@@ -37,7 +37,8 @@ export default {
 ╰━━━━━━━━━━━━━━━━━━⬣
 
 ╭━〔 *🛠️ TOOLS* 〕━⬣
-┃
+┃*p ping*, ver el ping del 
+   estado del bot.
 ┃ 
 ┃
 ╰━━━━━━━━━━━━━━━━━━⬣
