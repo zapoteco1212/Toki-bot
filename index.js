@@ -12,16 +12,22 @@ for (let p of ["./lib/db.js","./lib/database.js","./src/db.js","./database.js","
 }
 if (!db) console.log("AVISO: usando prefijo en archivo./lib/prefix.json")
 
+// FIX: Exponer la DB global para que bal/baltop funcionen
+global.db = db
+if (db?.data) global.db.data = db.data
+if (!global.db) global.db = { data: { users: {}, chats: {}, settings: {} } }
+if (!global.db.data) global.db.data = global.db
+
 global.comandos = new Map()
 function loadPlugins(dir) {
   for (let file of fs.readdirSync(dir)) {
     const fullPath = join(dir, file)
     if (fs.statSync(fullPath).isDirectory()) loadPlugins(fullPath)
     else if (file.endsWith('.js')) {
-      import("file://"+fullPath).then(pl=>{
+      import("file://"+fullPath+"?update="+Date.now()).then(pl=>{
         const cmd = pl.default || pl
-        if (cmd.command) for (let c of cmd.command) global.comandos.set(c, cmd)
-      })
+        if (cmd.command) for (let c of cmd.command) global.comandos.set(c.toLowerCase(), cmd)
+      }).catch(e=>console.log(`❌ ${file}: ${e.message}`))
     }
   }
 }
@@ -41,12 +47,12 @@ async function getPrefix(idBot) {
     if (Array.isArray(filePref)) return filePref
   }
   try {
-    if (!db) return filePref || ["."]
+    if (!db) return filePref || [".","+"]
     const c = await db.getSettings(idBot)
     if (c.prefijo === 1) return []
     if (Array.isArray(c.prefijo)) return c.prefijo
-    return filePref || ["."]
-  } catch { return filePref || ["."] }
+    return filePref || [".","+"]
+  } catch { return filePref || [".","+" ] }
 }
 
 async function startBot() {
@@ -81,9 +87,10 @@ async function startBot() {
     const plugin = global.comandos.get(command)
     if (plugin) {
       try {
+        // FIX: Ahora si pasa usedPrefix y command como tu baltop necesita
         if (plugin.category==='socket') await plugin.run({msg:m,sock:client,args,command,usedPrefix:used})
-        else await plugin.run(client,m,args)
-      } catch(e){ console.log(e) }
+        else await plugin.run(client,m,args,used,command)
+      } catch(e){ console.log(`Error en ${command}:`, e) }
     }
   })
 }
