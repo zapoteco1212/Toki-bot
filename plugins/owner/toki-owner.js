@@ -1,52 +1,21 @@
 import util from 'util'
-
-export const tokiOwnersStyle = (owners) => {
-  let list = owners.map((v,i) => `❖ *${i+1}.* @${v} - \`${v}\``).join('\n')
-  return `> 𖧧 *OWNER LIST - TOKI BOT*
-
-༺═━━━━━✦❖✦━━━━━═༻
-❖ *ᴛᴏᴛᴀʟ ::* ${owners.length} Owners
-༺═━━━━━✦❖✦━━━━━═༻
-
-${list}
-
-༺═━━━━━✦❖✦━━━━━═༻
-> Array crudo:
-\`\`\`js
-${JSON.stringify(owners, null, 2)}
-\`\`\`
-༺═━━━━━✦❖✦━━━━━═༻`
-}
-
 export default {
-  command: ['e', 'owner', 'owners', 'listowner', 'ownerlist'],
-  category: 'owner',
+  command: ['e','owner','owners','listowner'],
   isOwner: true,
-  run: async (client, m, args, used) => {
-    
-    let query = args.join(' ').trim().toLowerCase()
-
-    
-    if (!query || query === 'owner' || query === 'owners') {
-      let owners = global.owner || global.owners || global.db?.data?.settings?.owners || []
-      if (owners[0]?.jid) owners = owners.map(v => v.jid.split('@')[0])
-      owners = owners.map(v => String(v).replace(/[^0-9]/g, ''))
-
-      let txt = tokiOwnersStyle(owners)
-      return await client.sendMessage(m.chat, {
-        text: txt,
-        mentions: owners.map(v => v + '@s.whatsapp.net')
-      }, { quoted: m })
+  run: async (client, m, args) => {
+    let owners = global.owner || []
+    if (owners[0]?.jid) owners = owners.map(v => v.jid.split('@')[0])
+    owners = owners.map(v => String(v).replace(/[^0-9]/g, ''))
+    if (!args[0] || args[0].toLowerCase() === 'owner') {
+      let list = owners.map((v,i) => `❖ *${i+1}.* wa.me/${v} - \`${v}\``).join('\n')
+      let txt = `> 𖧧 *OWNER LIST - TOKI BOT*\n\n༺═━━━━━✦❖✦━━━━━═༻\n❖ *ᴛᴏᴛᴀʟ ::* ${owners.length}\n༺═━━━━━✦❖✦━━━━━═༻\n\n${list}\n\n༺═━━━━━✦❖✦━━━━━═༻\n\`\`\`js\n${JSON.stringify(owners, null, 2)}\n\`\`\`\n༺═━━━━━✦❖✦━━━━━═༻`
+      return await client.sendMessage(m.chat, { text: txt, mentions: owners.map(v=>v+'@s.whatsapp.net') }, { quoted: m })
     }
-
-    
     try {
-      let code = args.join(' ')
-      let result = await eval(`(async () => { return ${code} })()`)
-      if (typeof result!== 'string') result = util.format(result)
-      await m.reply(result)
-    } catch (e) {
-      await m.reply(`༺═━━━━━✦❖✦━━━━━═༻\n*ERROR TOKI:*\n${e.message}\n༺═━━━━━✦❖✦━━━━━═༻`)
+      let result = await eval(`(async()=>{ return ${args.join(' ')} })()`)
+      await client.sendMessage(m.chat, { text: util.format(result) }, { quoted: m })
+    } catch(e) {
+      await client.sendMessage(m.chat, { text: `Error: ${e.message}` }, { quoted: m })
     }
   }
-  }
+}
