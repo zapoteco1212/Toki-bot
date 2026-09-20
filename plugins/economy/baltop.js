@@ -1,47 +1,55 @@
 
-import fs from 'fs'
-
-function getUsers() {
-  if (global.db?.data?.users) return global.db.data.users
-  if (global.db?.users) return global.db.users
-  if (global.DATABASE?.data?.users) return global.DATABASE.data.users
-  for (const p of ['./database.json','./core/database.json','./lib/database.json']) {
-    try {
-      if (fs.existsSync(p)) {
-        const j = JSON.parse(fs.readFileSync(p,'utf8'))
-        if (j.users) return j.users
-        if (j.data?.users) return j.data.users
-      }
-    } catch {}
-  }
-  return {}
-}
-
 export default {
-  command: ['baltop','topbal','balancetop','topdinero'],
+  command: ['economyboard','eboard','baltop'],
   run: async (sock, m, args) => {
     const chatId = m.key.remoteJid
-    const users = getUsers()
-    const list = Object.entries(users)
-
-    if (!list.length) {
-      return sock.sendMessage(chatId, { text: '❌ No hay usuarios.' }, { quoted: m })
+    const db = global.db?.data || global.db
+    if (!db?.chats?.[chatId]) {
+      return sock.sendMessage(chatId, { text: '❌ No hay datos de este chat.' }, { quoted: m })
     }
 
-    const sorted = list.map(([jid, data]) => {
-      const money = data.money || data.coin || data.dinero || 0
-      const bank = data.bank || data.banco || 0
-      const total = Number(money) + Number(bank)
-      const name = data.name || jid.split('@')[0]
-      return { name, money, bank, total }
-    }).sort((a,b) => b.total - a.total).slice(0, 10)
+    const botId = sock.user.id.split(':')[0] + '@s.whatsapp.net'
+    const monedas = db.settings?.[botId]?.currency || 'Coins'
+    const chatData = db.chats[chatId]
 
-    let text = `💰 *BALANCE TOP*\n\n`
-    sorted.forEach((u, i) => {
-      let med = ['🥇','🥈','🥉'][i] || `${i+1}.`
-      text += `${med} ${u.name}\n • Efectivo: ${u.money}\n • Banco: ${u.bank} | Total: ${u.total}\n\n`
-    })
+    try {
+      const users = Object.entries(chatData.users || {})
+       .filter(([_, data]) => ((data.coins || 0) + (data.bank || 0)) >= 1000)
+       .map(([key, data]) => {
+          const name = db.users?.[key]?.name || data.name || 'Usuario'
+          return {...data, jid: key, name }
+        })
 
-    await sock.sendMessage(chatId, { text: text.trim() }, { quoted: m })
-  }
+      if (users.length === 0) {
+        return sock.sendMessage(chatId, { text: `ꕥ No hay usuarios en el grupo con más de 1,000 ${monedas}.` }, { quoted: m })
       }
+
+      const sorted = users.sort((a, b) => ((b.coins||0)+(b.bank||0)) - ((a.coins||0)+(a.bank||0)))
+      const page = parseInt(args[0]) || 1
+      const pageSize = 10
+      const totalPages = Math.ceil(sorted.length / pageSize)
+
+      if (isNaN(page) || page < 1 || page > totalPages) {
+        return sock.sendMessage(chatId, { text: `《✧》 La página *${page}* no existe. Hay *${totalPages}* páginas.` }, { quoted: m })
+      }
+
+      const start = (page - 1) * pageSize
+      const end = start + pageSize
+
+      let text = `*✩ EconomyBoard (✿◡‿◡)*\n\n`
+      text += sorted.slice(start, end).map(({ name, coins, bank }, i) => {
+        const total = (coins || 0) + (bank || 0)
+        return `✩ ${start + i + 1} › *${name}*\n Total → *¥${total.toLocaleString()} ${monedas}*`
+      }).join('\n')
+
+      text += `\n\n> ⌦ Página *${page}* de *${totalPages}*`
+      if (page < totalPages) {
+        text += `\n> Para ver la siguiente página › *.eboard ${page + 1}*`
+      }
+
+      await sock.sendMessage(chatId, { text }, { quoted: m })
+    } catch (e) {
+      await sock.sendMessage(chatId, { text: `> Error: ${e.message}` }, { quoted: m })
+    }
+  }
+        }
