@@ -1,5 +1,4 @@
-
-import fetch from 'node-fetch';
+const fetch = global.fetch || (await import('node-fetch')).default;
 import FormData from 'form-data';
 import db from '#db';
 
