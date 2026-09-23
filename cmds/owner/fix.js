@@ -9,76 +9,66 @@ export default {
   category: 'owner',
   run: async (client, m) => {
     if (!global.owner?.includes(m.sender.split('@')[0]) &&!m.fromMe) {
-      return client.sendMessage(m.chat, { text: '❌ *Solo Owner puede usar esto*' }, { quoted: m })
+      return client.sendMessage(m.chat, { text: '❌ *Solo Owner*' }, { quoted: m })
     }
 
     const editor = m.pushName || 'Owner'
-    let msg = await client.sendMessage(m.chat, { text: `╭─❀ *S I N C R O N I Z A N D O* ❀\n│\n│ ⏳ Bajando actualización de GitHub...\n╰─>` }, { quoted: m })
+    let msg = await client.sendMessage(m.chat, { text: `╭─❀ *S I N C R O N I Z A N D O* ❀\n│ ⏳ Bajando actualización...\n╰─>` }, { quoted: m })
 
     try {
       
-      await execAsync('git fetch origin && git reset --hard origin/main && git pull origin main --force')
+      await execAsync('git fetch origin && git reset --hard origin/main && git pull origin main --force').catch(e => { throw new Error('Git Error: ' + e.message) })
 
-      
       let filesOutput = ''
       try {
         const { stdout } = await execAsync('git log -1 --name-only --pretty=format:')
         filesOutput = stdout
       } catch {}
 
-      
+  
       if (filesOutput.includes('package.json')) {
-        await client.sendMessage(m.chat, { text: '📦 `package.json` detectado, instalando y parchando...', edit: msg.key })
-
-        await execAsync('npm install --legacy-peer-deps --silent')
-
-        
-        const isTermux = fs.existsSync('/data/data/com.termux')
-        const libPath = './node_modules/@skidy89/libsignal-plugins'
-        const releaseSo = path.join(libPath, 'target/release')
+        await client.sendMessage(m.chat, { text: '📦 package.json detectado, instalando...', edit: msg.key }).catch(() => {})
+        try {
+          await execAsync('npm install --no-audit --no-fund')
+        } catch (e) {
+          console.log('npm install error:', e.message)
+        }
 
         
-        if (isTermux) {
-          try {
-          
-            if (fs.existsSync(`${process.env.HOME}/libsignal-plugins/target/release`)) {
-              const soFile = fs.readdirSync(`${process.env.HOME}/libsignal-plugins/target/release`).find(f => f.endsWith('.so'))
+        try {
+          if (fs.existsSync('/data/data/com.termux')) {
+            const home = process.env.HOME || '/data/data/com.termux/files/home'
+            const libPath = './node_modules/@skidy89/libsignal-plugins'
+            const compiledPath = `${home}/libsignal-plugins/target/release`
+
+            if (fs.existsSync(compiledPath) && fs.existsSync(libPath)) {
+              const files = fs.readdirSync(compiledPath)
+              const soFile = files.find(f => f.endsWith('.so'))
               if (soFile) {
-                const srcSo = `${process.env.HOME}/libsignal-plugins/target/release/${soFile}`
-                const dest1 = path.join(libPath, 'libsignal-plugins.android-arm64.node')
-                const dest2 = path.join(libPath, 'libsignal-plugins.linux-arm64-gnu.node')
-                if (fs.existsSync(libPath)) {
-                  fs.copyFileSync(srcSo, dest1)
-                  fs.copyFileSync(srcSo, dest2)
-                }
-              }
-            } else if (fs.existsSync(releaseSo)) {
-              
-              const soFile = fs.readdirSync(releaseSo).find(f => f.endsWith('.so'))
-              if (soFile) {
-                fs.copyFileSync(path.join(releaseSo, soFile), path.join(libPath, 'libsignal-plugins.android-arm64.node'))
-                fs.copyFileSync(path.join(releaseSo, soFile), path.join(libPath, 'libsignal-plugins.linux-arm64-gnu.node'))
+                const src = path.join(compiledPath, soFile)
+                fs.copyFileSync(src, path.join(libPath, 'libsignal-plugins.android-arm64.node'))
+                fs.copyFileSync(src, path.join(libPath, 'libsignal-plugins.linux-arm64-gnu.node'))
+                console.log('[FIX] libsignal parcheado OK')
               }
             }
-          } catch (e) {
-            console.log('Error parche libsignal:', e.message)
           }
+        } catch (e) {
+          console.log('[FIX] No se pudo parchar libsignal, no importa:', e.message)
         }
       }
 
       
       try {
-        const { loadCommands } = await import('../main.js?update=' + Date.now())
+        const { loadCommands } = await import(`../main.js?update=${Date.now()}`)
         if (loadCommands) await loadCommands()
-      } catch {}
+      } catch (e) {
+        console.log('loadCommands error:', e.message)
+      }
 
-      let archivos = filesOutput? filesOutput.trim().split('\n').filter(f => f && f.trim()) : []
+      let archivos = filesOutput? filesOutput.trim().split('\n').filter(f => f.trim()) : []
       let total = archivos.length || 0
-      let detalle = total > 0
-       ? archivos.slice(0, 15).map(f => `│ • \`${f.trim()}\``).join('\n')
-        : '│ • `Actualización general / fix menor`'
-
-      if (total > 15) detalle += `\n│ • _... y ${total - 15} más_`
+      let detalle = total > 0? archivos.slice(0, 10).map(f => `│ • \`${f.trim()}\``).join('\n') : '│ • `Fix menor`'
+      if (total > 10) detalle += `\n│ • _... y ${total - 10} más_`
 
       let commit = 'Sin info'
       try {
@@ -90,20 +80,21 @@ export default {
 │
 │ ✦ *Editor:* ${editor}
 │ ✦ *Commit:* ${commit}
-│ ✦ *Total Cambios:* ${total || 1} archivo(s)
+│ ✦ *Total:* ${total || 1} archivo(s)
 │
 │ ✦ *Detalles:*
 ${detalle}
 │
-╰─> *Bot sincronizado con GitHub* ✅`
+╰─> *Bot sincronizado* ✅`
 
       await client.sendMessage(m.chat, { text: texto, edit: msg.key })
 
     } catch (e) {
       await client.sendMessage(m.chat, {
-        text: `╭─❌ *ERROR EN UPDATE*\n│\n│ ${e.message.slice(0, 800)}\n╰─> Revisa tu consola`,
+        text: `╭─❌ *ERROR EN UPDATE*\n│\n│ ${String(e.message).slice(0, 700)}\n╰─>`,
         edit: msg?.key
       }, { quoted: m })
+      console.log(e)
     }
   }
-          }
+                                       }
