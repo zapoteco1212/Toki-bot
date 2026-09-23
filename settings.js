@@ -6,7 +6,7 @@ const botOwner = ['5217551011162']
 
 const mainOwners = [
 '5217442573779', 
-'5217441863414', 
+'5217441863414',
 ]
 
 const extraOwners = [
