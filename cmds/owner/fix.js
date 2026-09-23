@@ -2,93 +2,108 @@ import { exec } from 'child_process'
 import { promisify } from 'util'
 import fs from 'fs'
 import path from 'path'
-import { fileURLToPath } from 'url'
-import chalk from 'chalk'
-
-const execPromise = promisify(exec)
-const __filename = fileURLToPath(import.meta.url)
-const __dirname = path.dirname(__filename)
-
-async function reloadCommands(dir = path.join(__dirname, '..')) {
-  const commandsMap = new Map()
-  async function readCommands(folder) {
-    const files = fs.readdirSync(folder)
-    for (const file of files) {
-      const fullPath = path.join(folder, file)
-      if (fs.lstatSync(fullPath).isDirectory()) {
-        await readCommands(fullPath)
-      } else if (file.endsWith('.js')) {
-        try {
-          const { default: cmd } = await import(`file://${fullPath}?update=${Date.now()}`)
-          if (cmd?.command) {
-            cmd.command.forEach((c) => {
-              commandsMap.set(c.toLowerCase(), cmd)
-            })
-          }
-        } catch (err) {
-          console.error(`Error recargando comando ${file}:`, err)
-        }
-      }
-    }
-  }
-  await readCommands(dir)
-  global.comandos = commandsMap
-}
+const execAsync = promisify(exec)
 
 export default {
-  command: ['fix'],
-  isOwner: true,
+  command: ['fix', 'actualizar', 'update', 'sync'],
+  category: 'owner',
   run: async (client, m) => {
+    if (!global.owner?.includes(m.sender.split('@')[0]) &&!m.fromMe) {
+      return client.sendMessage(m.chat, { text: '❌ *Solo Owner puede usar esto*' }, { quoted: m })
+    }
+
+    const editor = m.pushName || 'Owner'
+    let msg = await client.sendMessage(m.chat, { text: `╭─❀ *S I N C R O N I Z A N D O* ❀\n│\n│ ⏳ Bajando actualización de GitHub...\n╰─>` }, { quoted: m })
+
     try {
-      await client.sendMessage(m.chat, { react: { text: '🕑', key: m.key } })
+      
+      await execAsync('git fetch origin && git reset --hard origin/main && git pull origin main --force')
 
-      await execPromise('git config user.email "bot@host.com"')
-      await execPromise('git config user.name "HostBot"')
-      await execPromise('git fetch origin')
+      
+      let filesOutput = ''
+      try {
+        const { stdout } = await execAsync('git log -1 --name-only --pretty=format:')
+        filesOutput = stdout
+      } catch {}
 
-      const { stdout: branch } = await execPromise('git rev-parse --abbrev-ref HEAD')
-      const currentBranch = branch.trim()
-      const { stdout: diffStatus } = await execPromise(`git diff --name-status HEAD..origin/${currentBranch}`).catch(() => ({ stdout: '' }))
-      const { stdout: info } = await execPromise(`git log HEAD..origin/${currentBranch} --format="%an" -1`).catch(() => ({ stdout: 'Desconocido' }))
+      
+      if (filesOutput.includes('package.json')) {
+        await client.sendMessage(m.chat, { text: '📦 `package.json` detectado, instalando y parchando...', edit: msg.key })
 
-      const lines = diffStatus.trim().split('\n').filter(line => line.trim() !== '')
-      const totalFiles = lines.length
+        await execAsync('npm install --legacy-peer-deps --silent')
 
-      if (totalFiles > 0) {
-        await execPromise(`git reset --hard origin/${currentBranch}`)
+        
+        const isTermux = fs.existsSync('/data/data/com.termux')
+        const libPath = './node_modules/@skidy89/libsignal-plugins'
+        const releaseSo = path.join(libPath, 'target/release')
 
-        await reloadCommands(path.join(__dirname, '..'))
-
-        let changeList = lines.map(line => {
-          const [status, ...fileParts] = line.split(/\s+/)
-          const file = fileParts.join(' ')
-          switch (status) {
-            case 'A': return `+ ${file}`
-            case 'M': return `• ${file}`
-            case 'D': return `- ${file}`
-            default: return `? ${file}`
+        
+        if (isTermux) {
+          try {
+          
+            if (fs.existsSync(`${process.env.HOME}/libsignal-plugins/target/release`)) {
+              const soFile = fs.readdirSync(`${process.env.HOME}/libsignal-plugins/target/release`).find(f => f.endsWith('.so'))
+              if (soFile) {
+                const srcSo = `${process.env.HOME}/libsignal-plugins/target/release/${soFile}`
+                const dest1 = path.join(libPath, 'libsignal-plugins.android-arm64.node')
+                const dest2 = path.join(libPath, 'libsignal-plugins.linux-arm64-gnu.node')
+                if (fs.existsSync(libPath)) {
+                  fs.copyFileSync(srcSo, dest1)
+                  fs.copyFileSync(srcSo, dest2)
+                }
+              }
+            } else if (fs.existsSync(releaseSo)) {
+              
+              const soFile = fs.readdirSync(releaseSo).find(f => f.endsWith('.so'))
+              if (soFile) {
+                fs.copyFileSync(path.join(releaseSo, soFile), path.join(libPath, 'libsignal-plugins.android-arm64.node'))
+                fs.copyFileSync(path.join(releaseSo, soFile), path.join(libPath, 'libsignal-plugins.linux-arm64-gnu.node'))
+              }
+            }
+          } catch (e) {
+            console.log('Error parche libsignal:', e.message)
           }
-        }).slice(0, 20).join('\n')
-
-        let msg = `❀ *Actualización exitosa*\n\n`
-        msg += `亗 *Editor:* ${info.trim()}\n`
-        msg += `✎ *Total Cambios:* ${totalFiles}\n\n`
-        msg += `ꕥ *Detalles de archivos:*\n\`\`\`${changeList}${totalFiles > 20 ? '\n...entre otros.' : ''}\`\`\`\n\n`
-
-        await client.sendMessage(m.chat, { text: msg }, { quoted: m })
-      } else {
-        await client.sendMessage(m.chat, { text: 'ꕥ *Estado:* El bot ya está en su última versión.' }, { quoted: m })
+        }
       }
 
-      await client.sendMessage(m.chat, { react: { text: '✅', key: m.key } })
-      console.log(chalk.greenBright(`✅ rfix: Cambios aplicados y comandos recargados.`))
+      
+      try {
+        const { loadCommands } = await import('../main.js?update=' + Date.now())
+        if (loadCommands) await loadCommands()
+      } catch {}
 
-      if (global.db && global.db.write) await global.db.write()
+      let archivos = filesOutput? filesOutput.trim().split('\n').filter(f => f && f.trim()) : []
+      let total = archivos.length || 0
+      let detalle = total > 0
+       ? archivos.slice(0, 15).map(f => `│ • \`${f.trim()}\``).join('\n')
+        : '│ • `Actualización general / fix menor`'
 
-    } catch (error) {
-      console.error(error)
-      await client.sendMessage(m.chat, { react: { text: '❌', key: m.key } })
-      await m.reply(`*⚠️ ERROR EN FIX:* \n\n${error.message}`)
+      if (total > 15) detalle += `\n│ • _... y ${total - 15} más_`
+
+      let commit = 'Sin info'
+      try {
+        const { stdout } = await execAsync('git log -1 --pretty=format:"%h | %s"')
+        commit = stdout.trim()
+      } catch {}
+
+      let texto = `╭─❀ *A C T U A L I Z A C I Ó N E X I T O S A* ❀
+│
+│ ✦ *Editor:* ${editor}
+│ ✦ *Commit:* ${commit}
+│ ✦ *Total Cambios:* ${total || 1} archivo(s)
+│
+│ ✦ *Detalles:*
+${detalle}
+│
+╰─> *Bot sincronizado con GitHub* ✅`
+
+      await client.sendMessage(m.chat, { text: texto, edit: msg.key })
+
+    } catch (e) {
+      await client.sendMessage(m.chat, {
+        text: `╭─❌ *ERROR EN UPDATE*\n│\n│ ${e.message.slice(0, 800)}\n╰─> Revisa tu consola`,
+        edit: msg?.key
+      }, { quoted: m })
     }
   }
-        }
+          }
